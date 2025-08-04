@@ -1,0 +1,4 @@
+{mut:0, indel:0, dup:}	{mut:0, indel:0, dup:(4, 29)}	{mut:0, indel:0, dup:(4, 30)}	{mut:2, indel:4, dup:(4, 1)(8, 6)}
+{mut:0, indel:0, dup:(4, 29)}	{mut:0, indel:0, dup:}	{mut:0, indel:0, dup:(4, 1)}	{mut:15, indel:2, dup:(4, 16)}
+{mut:0, indel:0, dup:(4, 30)}	{mut:0, indel:0, dup:(4, 1)}	{mut:0, indel:0, dup:}	{mut:15, indel:2, dup:(4, 17)}
+{mut:2, indel:4, dup:(4, 1)(8, 6)}	{mut:15, indel:2, dup:(4, 16)}	{mut:15, indel:2, dup:(4, 17)}	{mut:0, indel:0, dup:}
