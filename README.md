@@ -60,7 +60,7 @@ The first line shows the total execution time of the entire program (excluding s
 2 msec (main dp)
 ```
 - `-e` : Output encodings file (Optional)  
-Outputs the result of string decomposer in FASTA-like format. The correspondence of unit IDs and the their sequences is shown in the first line, in (number, unit sequence) format.
+Outputs the result of string decomposer in FASTA-like format. The correspondence of unit IDs and their sequences is shown in the first line, in (number, unit sequence) format.
 ```encodings.txt
 # units: (0, ACC) (1, AGC) 
 > seq1
