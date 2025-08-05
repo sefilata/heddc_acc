@@ -1,12 +1,12 @@
 ## heddc_acc
-`heddc_acc` is an accelerated version of hEDDC (Kawahara & Morishita, 2025) which calculates the edit distance with duplications and contractions (EDDC) between tandem repeats (TRs), including complex TRs composed of multiple units.
+`heddc_acc` is an accelerated version of hEDDC (Kawahara & Morishita, 2025) which calculates the edit distance with duplications and contractions (EDDC) between tandem repeats (TRs), including complex TRs composed of multiple units.  
 In this program, precomputations of distances between single units and unit sequences are omitted for long unit sequences, thus speeding up the entire program. Currently, the default parameters are 1.0 for mutations and indels (per base), and 0.5 * unit length for duplications/contractions.
 
 ## Usage
 ### Requirements and installation
 After installing GCC with C++20 support, run the following commands in the directory.
 ```bash
-git clone https://github.com/sefilata/heddc_acc
+git clone https://github.com/sefilata/heddc_acc.git
 cd heddc_acc
 make
 ```
@@ -59,7 +59,7 @@ The first line shows the total execution time of the entire program (excluding s
 5 msec (f_scores)
 2 msec (main dp)
 ```
-- `-e` : output encodings file (Optional)  
+- `-e` : Output encodings file (Optional)  
 Outputs the result of string decomposer in FASTA-like format. The correspondence of unit IDs and the their sequences is shown in the first line, in (number, unit sequence) format.
 ```encodings.txt
 # units: (0, ACC) (1, AGC) 
