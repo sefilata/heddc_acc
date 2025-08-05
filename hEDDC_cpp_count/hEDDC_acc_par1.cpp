@@ -112,13 +112,14 @@ Score edit_distance(const vector<int> &s, const vector<int> &t, double mut, doub
 
 // Params class 関連
 Params::Params(double m, double i, double d, const vector<vector<int>> &units){
+	int unit_num = units.size();
 	mut = m;
 	indel = i;
 	dup = d;
 
 	// 各ユニットのdup scoreの配列 (単塩基のdup/contはindelとする。ただし塩基がunitとして追加されている場合を除く。)
-	dup_scores.resize(units.size(), Score(0.0));
-	for(int i = 0; i < units.size(); i++){
+	dup_scores.resize(unit_num, Score(0.0));
+	for(int i = 0; i < unit_num; i++){
 		if(i < 4){
 			dup_scores[i].set_indel_2(1, indel);
 		}else{
@@ -128,9 +129,9 @@ Params::Params(double m, double i, double d, const vector<vector<int>> &units){
 
 	// (unit, base) -> (unit, base)
 	// 250424 適当に変えた。要確認。（重複の許可）
-	unit_to_unit.resize(units.size(), vector<Score>(units.size()));
-	for(int i = 0; i < units.size(); i++){
-		for(int j = i; j < units.size(); j++){
+	unit_to_unit.resize(unit_num, vector<Score>(units.size()));
+	for(int i = 0; i < unit_num; i++){
+		for(int j = i; j < unit_num; j++){
 			unit_to_unit[i][j] = min(
 				edit_distance(units[i], units[j], mut, indel),
 				dup_scores[i] + dup_scores[j]
@@ -140,8 +141,8 @@ Params::Params(double m, double i, double d, const vector<vector<int>> &units){
 	}
 
 	// 各ユニットのindel scoreの配列
-	indel_scores.resize(units.size(), Score(0.0));
-	for(int i = 0; i < units.size(); i++){
+	indel_scores.resize(unit_num, Score(0.0));
+	for(int i = 0; i < unit_num; i++){
 		indel_scores[i].set_indel_2(units[i].size(), indel);
 	}
 }
@@ -184,7 +185,7 @@ void print_vec2_score(const vector<vector<Score>> &vec2){
 	cout << endl;
 }
 void print_vec3_score(vector<vector<vector<Score>>> vec){
-	for(int a = 0; a < vec.size(); a++){
+	for(int a = 0; a < (int)vec.size(); a++){
 		cout << "number " << a << ": " << endl;
 		for(vector<Score> inner_vec : vec[a]){
 			for(Score score : inner_vec){cout << setw(2) << setfill(' ') << score.get_score() << " ";}
@@ -240,7 +241,7 @@ void string_to_unit(
 					});
 
 					// 元のアルゴリズムだとうまくいかないのでこの部分を追加
-					if(j-i <= units[a].size()){
+					if(j-i <= (int)units[a].size()){
 						tmp = min(tmp, edit_distance(s, units[a], params.mut_val(), params.indel_val(), i, j));
 					}
 
@@ -406,6 +407,7 @@ void calc_f(
 	vector<long long> &measure_time
 ){
 	int ub_num = units.size();
+	int reads_num = reads.size();
 	int eps = ub_num - 1;
 
 	// calc_eddc()の仕様上, eddc_unitsは[{bases}, {units}]の順番にする必要がある。これはあとで修正する。
@@ -491,7 +493,7 @@ void calc_f(
 	// for(auto &[x,y,z] : valid_rules_xyz){cout << x << y << z << endl;}
 
 	// f[w,b,e,z]
-	for(int w = 0; w < reads.size(); w++){
+	for(int w = 0; w < reads_num; w++){
 		int n = reads[w].size();
 
 		// dp[b,e,z]: f_scores[w][b,e,z] = Cost(w[b,e), z) = min_{b<k<=e}{min_{x\in U}{dp[b,k,x] + dp_sub[k,e,x,z]}}
@@ -595,7 +597,6 @@ Score calc_heddc(
 	int n = u.size();
 	int m = v.size();
 	int ub_num = units.size();
-	int eps = ub_num - 1;
 
 	// dp[i,j] = Cost(u[0,i), v[0,j))
 	vector<vector<Score>> dp(n+1, vector<Score>(m+1, Score(DBL_MAX)));
@@ -654,7 +655,7 @@ void heddc_all(
 	// acc1を [encoding長 / 最短encoding長] を基準にする
 	int min_enc_len = INT_MAX;
 	for(const auto &enc : encodings){
-		if(enc.size() < min_enc_len){min_enc_len = enc.size();}
+		if((int)enc.size() < min_enc_len){min_enc_len = enc.size();}
 	}
 	min_enc_len = max(1, min_enc_len-1);    // バッファ (& 0にならないように)
 	vector<int> acc_par1s(tr_num);
@@ -662,8 +663,8 @@ void heddc_all(
 		acc_par1s[i] = max(acc_par1, int(encodings[i].size() / min_enc_len));
 		acc_par1s[i] = max(acc_par1s[i], (int)encodings[i].size() - min_enc_len);
 	}
-	// main dpでの最大長さ (が[read長の差 / 最小ユニット長]の何倍か)
-	// enc長の差の何倍かに変更
+	// // main dpでの最大長さ (が[read長の差 / 最小ユニット長]の何倍か)
+	// // enc長の差の何倍かに変更
 	// double acc_par2_ratio = (double)INT_MAX / 10.0;
 	// int min_unit_len = INT_MAX;
 	// for(const auto &unit : units){
@@ -672,31 +673,12 @@ void heddc_all(
 
 	// unitsにbaseとepsを追加する
 	add_base_eps(units);
-	int ub_num = units.size();
+	// int ub_num = units.size();
 
 	// f[u,b,e,x] = Pr(u[b,e) -> x)
 	// 各u (read) に対してfを計算する
 	vector<vector<vector<vector<Score>>>> f_scores(tr_num);
 	calc_f(encodings, units, params, f_scores, acc_par1s, measure_time);
-
-	#pragma region debug_print_f
-	// print f_scores
-	// for(int u = 0; u < tr_num; u++){
-	// 	for(int x = 0; x < ub_num; x++){
-	// 		cout << "f[" << u << ",b,e,\"";
-	// 		for(int c : units[x]){cout << c;}
-	// 		cout << "\"]" << endl;
-	// 		for(const auto &vecs : f_scores[u]){
-	// 			for(const auto &vec : vecs){
-	// 				if(vec[x] > 1e+300){cout << "   MAX";}
-	// 				else{cout << setw(6) << setfill(' ') <<vec[x];}
-	// 			}
-	// 			cout << endl;
-	// 		}
-	// 		cout << endl;
-	// 	}
-	// }
-	#pragma endregion
 
 	// 各組み合わせについてheddcを実行する
 	scores.assign(tr_num, vector<Score>(tr_num, Score(0.0)));

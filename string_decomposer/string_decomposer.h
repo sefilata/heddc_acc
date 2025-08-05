@@ -38,6 +38,7 @@ void string_decomposer(
 );
 
 
+/*
 // decompがunitのprefixに誤差1-similarity未満で一致するかどうかを判定し，一致するならばunits_to_addに追加する
 void match_prefix(
 	const vector<int> &unit,
@@ -142,3 +143,4 @@ void unit_variant(
 	vector<vector<vector<int>>> &decomposed_seqs,
 	int num_variants = -1		// 何個のvariantsをとるか？
 );
+*/

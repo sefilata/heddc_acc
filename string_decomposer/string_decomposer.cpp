@@ -6,9 +6,10 @@ SDParams::SDParams(double m, double mis, double in) : match(m), mismatch(mis), i
 
 
 SD::SD(int seq_len, const vector<vector<int>> &blocks, const SDParams &params){
+	int block_num = blocks.size();
 	// resize
-	dp.resize(blocks.size(), vector<vector<double>>());
-	for(int b = 0; b < blocks.size(); b++){
+	dp.resize(block_num, vector<vector<double>>());
+	for(int b = 0; b < block_num; b++){
 		dp[b] = vector<vector<double>>(blocks[b].size()+1, vector<double>(seq_len+1, 0));
 	}
 	block_switch.resize(seq_len+1, -1);
@@ -16,7 +17,7 @@ SD::SD(int seq_len, const vector<vector<int>> &blocks, const SDParams &params){
 	// initialize
 	for(int j = 1; j < seq_len+1; j++){
 		// for(int b = 0; b < blocks.size(); b++){dp[b][0][j] = j * params.indel;}
-		for(int b = 0; b < blocks.size(); b++){dp[b][0][j] = -DBL_MAX;}
+		for(int b = 0; b < block_num; b++){dp[b][0][j] = -DBL_MAX;}
 	}
 }
 
@@ -28,12 +29,14 @@ void string_decomposer(
 	vector<int> &encoding,					// encoded by block ids
 	vector<vector<int>> &decomposed_seq		// encoded by block sequences (with mutations)
 ){
+	int seq_len = seq.size();
+	int block_num = blocks.size();
 	SD sd(seq.size(), blocks, params);
 
 	// main DP
-	for(int j = 1; j < seq.size()+1; j++){
-		for(int b = 0; b < blocks.size(); b++){
-			for(int i = 1; i < blocks[b].size()+1; i++){
+	for(int j = 1; j < seq_len+1; j++){
+		for(int b = 0; b < block_num; b++){
+			for(int i = 1; i < (int)blocks[b].size()+1; i++){
 				double match_score = (blocks[b][i-1] == seq[j-1]) ? params.match : params.mismatch;
 				sd.dp[b][i][j] = max({
 					sd.dp[b][i-1][j-1] + match_score,
@@ -45,13 +48,13 @@ void string_decomposer(
 		}
 		// block-switching
 		double last_max = -DBL_MAX;
-		for(int b = 0; b < blocks.size(); b++){
+		for(int b = 0; b < block_num; b++){
 			if(sd.dp[b][blocks[b].size()][j] > last_max){
 				last_max = sd.dp[b][blocks[b].size()][j];
 				sd.block_switch[j] = b;
 			}
 		}
-		for(int b = 0; b < blocks.size(); b++){
+		for(int b = 0; b < block_num; b++){
 			sd.dp[b][0][j] = last_max;
 			// if(j < seq.size()){sd.dp[b][0][j+1] = last_max + params.indel;}
 		}
@@ -107,8 +110,9 @@ void string_decomposer(
 }
 
 
+
 // 以下，ユニット分解（あまりうまくいっていない）
-#pragma region unit_decompose
+/*
 
 // decompがunitのprefixに誤差1-similarity未満で一致するかどうかを判定し，一致するならばunits_to_addに追加する
 void match_prefix(
@@ -492,4 +496,4 @@ void unit_variant(
 	}
 }
 
-#pragma endregion
+*/

@@ -1,10 +1,10 @@
-# 各バージョンの違い
-## 高速化の種類
+## 各バージョンの違い
+### 高速化の種類
 - hEDDC
 	元々のhEDDC
 - hEDDC_acc
 	f計算時の制限を設けたhEDDC
-## パラメータのパターン
+### パラメータのパターン
 - par1
 	もともとの(ユニット長に比例する)dup/cont score
 - par2
@@ -12,8 +12,8 @@
 - par3
 	変異率に基づくもの（予定）
 
-# メモ
-## 実行方法
+## メモ
+### 実行方法
 - main_par1.cpp
 ```bash
 cd /home/sitoh/work/eddc_2504/hEDDC_cpp_count
@@ -33,6 +33,3 @@ output=$( { /usr/bin/time -f "%M" ./exec/acc_par1.out sample/test${idf}.fasta sa
 echo "$(echo "$output" | tail -n1) KiB (mem use)" >> sample/${idf}/${idf}acc_time.txt 	# memory consumption
 echo -n $(echo "$output" | head -n -1) 	# stdout, stderr
 ```
-
-# 履歴
-### 2025/08/04

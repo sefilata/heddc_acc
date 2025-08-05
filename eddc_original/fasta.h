@@ -20,7 +20,7 @@ map<int, char> base_map_reverse = {
 	{0, 'A'}, {1, 'T'}, {2, 'G'}, {3, 'C'}
 };
 void string_to_digits(const string &line, vector<int> &read){
-	for(int i = 0; i < line.length(); i++){
+	for(int i = 0; i < (int)line.length(); i++){
 		auto it = base_map.find(line[i]);
 		if(it == base_map.end()){
 			cerr << "[Error] (string_to_digits): no matching base character: " << line[i] << endl;
@@ -39,7 +39,7 @@ void encoding_to_digits(const string &line, vector<int> &encoding){
 }
 void digits_to_string(const vector<int> &read, string &line){
 	line.clear();
-	for(int i = 0; i < read.size(); i++){
+	for(int i = 0; i < (int)read.size(); i++){
 		auto it = base_map_reverse.find(read[i]);
 		if(it == base_map_reverse.end()){
 			cerr << "[Error] (digits_to_string): no matching base value: " << read[i] << endl;

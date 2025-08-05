@@ -1,0 +1,4 @@
+70 msec
+62 msec (c1,c2,valid_rules)
+5 msec (f_scores)
+2 msec (main dp)
