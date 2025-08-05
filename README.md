@@ -18,7 +18,7 @@ Run heddc_acc with the following command.
 ```
 
 ### Command line options and example files
-- `-f` : Input FASTA file of TRs (Required)
+- `-f` : Input FASTA file of TRs (Required)  
 Each sequence must be in a single line.
 ```reads.fasta
 > seq1
@@ -28,7 +28,7 @@ ACCACCACCACCACCAGC
 > seq3
 ACCACCACCACCACCAGCAGC
 ```
-- `-u` : Input FASTA file of units (Required)
+- `-u` : Input FASTA file of units (Required)  
 Each sequence must be in a single line. You can obtain units from TRs using other software such as `uTR` (Masutani et.al., 2023).
 ```units.fasta
 > unit1
@@ -36,7 +36,7 @@ ACC
 > unit2
 AGC
 ```
-- `-s` : Output file of edit distance (Optional)
+- `-s` : Output file of edit distance (Optional)  
 Outputs a TSV matrix of edit distance with duplications and contractions. Rows and columns follow the order of the input TR FASTA file. You can change the decimal precision by changing `SCORE_PRECISION` variable in `hEDDC_cpp_count/main.cpp`.
 If this option is omitted, the result is printed to stdout.
 ```scores.tsv
@@ -44,14 +44,14 @@ If this option is omitted, the result is printed to stdout.
 0.077151675	0	0.077151675
 0.047619048	0.077151675	0
 ```
-- `-v` : Output variations file (Optional)
+- `-v` : Output variations file (Optional)  
 Outputs the edit operations (mutations, indels, duplications/contractions) which minimize the cost for each pair of input TRs. Duplications/contractions are shown in (unit length, number of operations) format.
 ```variations.tsv
 {mut:0, indel:0, dup:}	{mut:0, indel:0, dup:(3, 1)}	{mut:1, indel:0, dup:}
 {mut:0, indel:0, dup:(3, 1)}	{mut:0, indel:0, dup:}	{mut:0, indel:0, dup:(3, 1)}
 {mut:1, indel:0, dup:}	{mut:0, indel:0, dup:(3, 1)}	{mut:0, indel:0, dup:}
 ```
-- `-t` : Output execution time file (Optional)
+- `-t` : Output execution time file (Optional)  
 The first line shows the total execution time of the entire program (excluding string decomposer).
 ```time.txt
 70 msec
@@ -59,7 +59,7 @@ The first line shows the total execution time of the entire program (excluding s
 5 msec (f_scores)
 2 msec (main dp)
 ```
-- `-e` : output encodings file (Optional)
+- `-e` : output encodings file (Optional)  
 Outputs the result of string decomposer in FASTA-like format. The correspondence of unit IDs and the their sequences is shown in the first line, in (number, unit sequence) format.
 ```encodings.txt
 # units: (0, ACC) (1, AGC) 
