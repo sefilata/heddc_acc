@@ -13,6 +13,7 @@
 #include <compare>
 
 #include "../string_decomposer/string_decomposer.h"
+#include "../eddc_original/fasta.h"
 
 using namespace std;
 
@@ -33,20 +34,20 @@ public:
 
 	// 各変数の追加
 	void set_indel(int len, const Params &par);
-	void set_mut(const Params &par);
-	void set_dup(int len, const Params &par);
+	// void set_mut(const Params &par);
+	// void set_dup(int len, const Params &par);
 	void set_zero();
 
 	// 変数の取得
 	double get_score() const;
 	int get_mut() const;
 	int get_indel() const;
-	void print_dup(ofstream &ofs) const;
+	void print_dup(ofstream &ofs, const vector<vector<int>> &units) const;
 
 	// edit_distance()とParamsのコンストラクタでのみ使用
 	void set_indel_2(int len, double par);
 	void set_mut_2(double par);
-	void set_dup_2(int len, double par);
+	void set_dup_2(int unit_id, double par);
 
 	// Score同士の加算
 	Score operator+(const Score &other) const;
@@ -65,13 +66,13 @@ Score edit_distance(const vector<int> &s, const vector<int> &t, double mut, doub
 // get_unit_to_unit() はこのままで良い？？
 class Params{
 private:
-	double mut, indel, dup;
+	double mut, indel;
 	vector<vector<Score>> unit_to_unit;
 	vector<Score> dup_scores;
 	vector<Score> indel_scores;
 
 public:
-	Params(double m, double i, double d, const vector<vector<int>> &units);
+	Params(double m, double i, int dup_pattern, const vector<vector<int>> &units);
 
 	Score get_unit_to_unit(int i, int j) const;
 	Score get_dup(int a) const;
@@ -79,12 +80,12 @@ public:
 
 	double mut_val() const;
 	double indel_val() const;
-	double dup_val() const;
+	// double dup_val() const;
 
 	// 変異の追加
 	void set_indel(int len, const Params &par);
 	void set_mut(const Params &par);
-	void set_dup(int len, const Params &par);
+	void set_dup(int unit_id, const Params &par);
 };
 
 // unitsにbase (A,T,G,C)とepsilonを追加する

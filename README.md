@@ -45,14 +45,14 @@ If this option is omitted, the result is printed to stdout.
 0.047619048	0.077151675	0
 ```
 - `-v` : Output variations file (Optional)  
-Outputs the edit operations (mutations, indels, duplications/contractions) which minimize the cost for each pair of input TRs. Duplications/contractions are shown in (unit length, number of operations) format.
+Outputs the edit operations (mutations, indels, duplications/contractions) which minimize the cost for each pair of input TRs. Duplications/contractions are shown in (unit sequence, number of dup/cons) format.
 ```variations.tsv
-{mut:0, indel:0, dup:}	{mut:0, indel:0, dup:(3, 1)}	{mut:1, indel:0, dup:}
-{mut:0, indel:0, dup:(3, 1)}	{mut:0, indel:0, dup:}	{mut:0, indel:0, dup:(3, 1)}
-{mut:1, indel:0, dup:}	{mut:0, indel:0, dup:(3, 1)}	{mut:0, indel:0, dup:}
+{mut:0, indel:0, dup:}	{mut:0, indel:0, dup:(ACC, 1)}	{mut:1, indel:0, dup:}
+{mut:0, indel:0, dup:(ACC, 1)}	{mut:0, indel:0, dup:}	{mut:0, indel:0, dup:(AGC, 1)}
+{mut:1, indel:0, dup:}	{mut:0, indel:0, dup:(AGC, 1)}	{mut:0, indel:0, dup:}
 ```
 - `-t` : Output execution time file (Optional)  
-The first line shows the total execution time of the entire program (excluding string decomposer).
+The first line shows the execution time of the entire program (excluding string decomposer).
 ```time.txt
 70 msec
 62 msec (c1,c2,valid_rules)
@@ -60,7 +60,7 @@ The first line shows the total execution time of the entire program (excluding s
 2 msec (main dp)
 ```
 - `-e` : Output encodings file (Optional)  
-Outputs the result of string decomposer in FASTA-like format. The correspondence of unit IDs and their sequences is shown in the first line, in (number, unit sequence) format.
+Outputs the result of string decomposer in FASTA-like format. The correspondence of unit IDs and their sequences is shown in the first line, in (unit ID, unit sequence) format.
 ```encodings.txt
 # units: (0, ACC) (1, AGC) 
 > seq1

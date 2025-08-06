@@ -13,6 +13,9 @@
 
 using namespace std;
 
+// Pattern of parameters of dup/cont; 0: 0.5*unit_length, 1: all 0.5
+const int PARAMETER_PATTERN = 0;
+
 
 void string_decompose(
 	const vector<vector<int>> &reads,
@@ -83,7 +86,8 @@ void out_scores(
 // 変異情報の出力
 void out_variants(
 	const vector<vector<Score>> &scores,
-	const string &out_file
+	const string &out_file,
+	const vector<vector<int>> &units
 ){
 	ofstream ofs(out_file);
 	if(!ofs.is_open()){
@@ -96,7 +100,7 @@ void out_variants(
 			ofs << "{mut:" << scores[i][j].get_mut();
 			ofs << ", indel:" << scores[i][j].get_indel();
 			ofs << ", dup:";
-			scores[i][j].print_dup(ofs);
+			scores[i][j].print_dup(ofs, units);
 			ofs << "}";
 			if(j != scores[i].size()-1) ofs << "\t";
 		}
@@ -140,7 +144,7 @@ int main(int argc, char* argv[]){
 	// mut, indel, dupのスコア（eddc_units は共通のものを使えるようにあとで修正）
 	vector<vector<int>> eddc_units = {{0}, {1}, {2}, {3}};
 	for(auto vec : units){eddc_units.push_back(vec);}
-	Params params(1.0, 1.0, 0.5, eddc_units);
+	Params params(1.0, 1.0, PARAMETER_PATTERN, eddc_units);
 
 	// string decomposer
 	vector<vector<int>> encodings;
@@ -158,6 +162,6 @@ int main(int argc, char* argv[]){
 
 	// 出力
 	out_scores(scores, reads, score_file);
-	out_variants(scores, variant_file);
+	out_variants(scores, variant_file, units);
 	out_time(dur_msec, dur_usec, time_file, measure_time);
 }

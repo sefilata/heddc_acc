@@ -5,7 +5,8 @@ CXXFLAGS = -std=c++20 -Wall -O2
 SRCS = \
     hEDDC_cpp_count/main.cpp \
     hEDDC_cpp_count/hEDDC_acc_par1.cpp \
-    string_decomposer/string_decomposer.cpp
+    string_decomposer/string_decomposer.cpp \
+    eddc_original/fasta.cpp
 
 OBJS = $(SRCS:.cpp=.o)
 

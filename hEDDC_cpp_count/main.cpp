@@ -13,7 +13,8 @@
 
 using namespace std;
 
-int SCORE_PRECISION = 8; // Number of decimal places for score output
+const int SCORE_PRECISION = 8; 	// Number of decimal places for score output
+const int PARAMETER_PATTERN = 0; 	// Pattern of parameters of dup/cont; 0: 0.5*unit_length, 1: all 0.5
 
 
 // String decomposer and encodings output
@@ -103,7 +104,8 @@ void print_scores(
 // Output variations (mutations, indels, duplications/contractions)
 void out_variants(
 	const vector<vector<Score>> &scores,
-	const string &out_file
+	const string &out_file,
+	const vector<vector<int>> &units
 ){
 	ofstream ofs(out_file);
 	if(!ofs.is_open()){
@@ -116,7 +118,7 @@ void out_variants(
 			ofs << "{mut:" << scores[i][j].get_mut();
 			ofs << ", indel:" << scores[i][j].get_indel();
 			ofs << ", dup:";
-			scores[i][j].print_dup(ofs);
+			scores[i][j].print_dup(ofs, units);
 			ofs << "}";
 			if(j != (int)scores[i].size()-1) ofs << "\t";
 		}
@@ -196,7 +198,7 @@ int main(int argc, char* argv[]){
 	// Scores of mutations, insertions, deletions
 	vector<vector<int>> eddc_units = {{0}, {1}, {2}, {3}};
 	for(auto vec : units){eddc_units.push_back(vec);}
-	Params params(1.0, 1.0, 0.5, eddc_units);
+	Params params(1.0, 1.0, PARAMETER_PATTERN, eddc_units);
 
 	// String decomposer
 	vector<vector<int>> encodings;
@@ -204,7 +206,7 @@ int main(int argc, char* argv[]){
 	string_decompose(reads, read_names, units, encodings, decomposed_seqs, encodings_file, e_flag);
 
 	// f score calculation limit length (setting minimum value of the limit)
-	int f_par = 5
+	int f_par = 5;
 	int ulen_max = 0, ulen_min = INT_MAX;
 	for(auto &unit : units){
 		ulen_max = max(ulen_max, (int)unit.size());
@@ -224,7 +226,7 @@ int main(int argc, char* argv[]){
 	// Results output
 	if(s_flag) out_scores(scores, reads, score_file);
 	else print_scores(scores, reads);
-	if(v_flag) out_variants(scores, variant_file);
+	if(v_flag) out_variants(scores, variant_file, units);
 	if(t_flag) out_time(dur_msec, dur_usec, time_file, measure_time);
 
 	return 0;

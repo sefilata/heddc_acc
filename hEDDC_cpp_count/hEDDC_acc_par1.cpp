@@ -1,27 +1,35 @@
 #include "hEDDC_acc_par1.h"
 
 
-// スコア構造体
+// Constructor of Score
 Score::Score() : score(0), mut(0), indel(0), dup() {}
 Score::Score(double s) : score(s), mut(0), indel(0), dup() {}
-// 各変数の追加
+// Setting zero for Score
 void Score::set_zero(){score = 0;}
-// 変数の取得
+// Getting variables in Score
 double Score::get_score() const {return score;}
 int Score::get_mut() const {return mut;}
 int Score::get_indel() const {return indel;}
-void Score::print_dup(ofstream &ofs) const {
+void Score::print_dup(ofstream &ofs, const vector<vector<int>> &units) const {
 	for(const auto &dup_ : dup){
 		if(dup_.second > 0){
-			ofs << "(" << dup_.first << ", " << dup_.second << ")";
+			if(dup_.first < 4){
+				cerr << "Warning: print_dup() called with unit_id < 4, which is not expected." << endl;
+				continue;
+			}
+			ofs << "(";
+			string unit_str;
+			digits_to_string(units[dup_.first - 4], unit_str);
+			ofs << unit_str;
+			ofs << ", " << dup_.second << ")";
 		}
 	}
 }
-// edit_distance()とParamsのコンストラクタでのみ使用
+// Used only in edit_distance() and Constructor of Params
 void Score::set_indel_2(int len, double par){score += par * len; indel += len;}
 void Score::set_mut_2(double par){score += par; mut++;}
-void Score::set_dup_2(int len, double par){score += par * len; dup.emplace(len, 1);}
-// Score同士の加算
+void Score::set_dup_2(int unit_id, double par){score += par; dup.emplace(unit_id, 1);}
+// Addition of Scores
 Score Score::operator+(const Score &other) const{
 	if(score < 0 || other.score < 0){cerr << "Error: operator + for minus scores" << endl;}
 	Score ret(score);
@@ -38,7 +46,7 @@ Score Score::operator+(const Score &other) const{
 	}
 	return ret;
 }
-// Score同士の加算代入
+// Addition assignment of Scores
 Score& Score::operator+=(const Score &other){
 	if(score < 0 || other.score < 0){cerr << "Error: operator += for minus scores" << endl;}
 	score += other.score;
@@ -53,30 +61,31 @@ Score& Score::operator+=(const Score &other){
 	}
 	return *this;
 }
-// Score同士の順序
+// Comparison of Scores
 auto Score::operator<=>(const Score &other) const{
 	return score <=> other.score;
 }
-// 各変異の追加
+// Setting indel, mutation, duplication/contraction
 void Score::set_indel(int len, const Params &par){
 	if(score < 0){cerr << "Error: set_indel for minus scores" << endl;}
 	score += par.indel_val() * len;
 	indel += len;
 }
-void Score::set_mut(const Params &par){
-	if(score < 0){cerr << "Error: set_mut for minus scores" << endl;}
-	score += par.mut_val();
-	mut++;
-}
-void Score::set_dup(int len, const Params &par){
-	if(score < 0){cerr << "Error: set_dup for minus scores" << endl;}
-	score += par.dup_val() * len;
-	if(dup.find(len) == dup.end()){
-		dup.emplace(len, 1);
-	}else{
-		dup[len]++;
-	}
-}
+// Not used (for what?? I forgot..)
+// void Score::set_mut(const Params &par){
+// 	if(score < 0){cerr << "Error: set_mut for minus scores" << endl;}
+// 	score += par.mut_val();
+// 	mut++;
+// }
+// void Score::set_dup(int unit_id, const Params &par){
+// 	if(score < 0){cerr << "Error: set_dup for minus scores" << endl;}
+// 	score += par.dup_val() * len;
+// 	if(dup.find(unit_id) == dup.end()){
+// 		dup.emplace(unit_id, 1);
+// 	}else{
+// 		dup[unit_id]++;
+// 	}
+// }
 
 // 従来の編集距離
 Score edit_distance(const vector<int> &s, const vector<int> &t, double mut, double indel, int st, int ed){
@@ -110,20 +119,22 @@ Score edit_distance(const vector<int> &s, const vector<int> &t, double mut, doub
 	return dp[n][m];
 }
 
-// Params class 関連
-Params::Params(double m, double i, double d, const vector<vector<int>> &units){
+// Params class functions
+// dup_pattern ... 0: 0.5*unit_length, 1: all 0.5
+Params::Params(double m, double i, int dup_pattern, const vector<vector<int>> &units){
 	int unit_num = units.size();
 	mut = m;
 	indel = i;
-	dup = d;
 
-	// 各ユニットのdup scoreの配列 (単塩基のdup/contはindelとする。ただし塩基がunitとして追加されている場合を除く。)
+	// Dup score of each unit (regards dup/cont of a single unit as a indel, if not the base is included in units)
 	dup_scores.resize(unit_num, Score(0.0));
 	for(int i = 0; i < unit_num; i++){
 		if(i < 4){
 			dup_scores[i].set_indel_2(1, indel);
 		}else{
-			dup_scores[i].set_dup_2(units[i].size(), dup);
+			if(dup_pattern == 0) dup_scores[i].set_dup_2(i, 0.5 * units[i].size());
+			else if(dup_pattern == 1) dup_scores[i].set_dup_2(i, 0.5);
+			else cerr << "Error: invalid dup_pattern" << endl;
 		}
 	}
 
@@ -140,7 +151,7 @@ Params::Params(double m, double i, double d, const vector<vector<int>> &units){
 		}
 	}
 
-	// 各ユニットのindel scoreの配列
+	// Indel score of each unit
 	indel_scores.resize(unit_num, Score(0.0));
 	for(int i = 0; i < unit_num; i++){
 		indel_scores[i].set_indel_2(units[i].size(), indel);
@@ -157,9 +168,9 @@ Score Params::get_indel(int a) const {
 }
 double Params::mut_val() const {return mut;}
 double Params::indel_val() const {return indel;}
-double Params::dup_val() const {return dup;}
+// double Params::dup_val() const {return dup;}
 
-// unitsにbase (A,T,G,C)とepsilonを追加する
+// Adds bases(A,T,G,C) and epsilon to units
 void add_base_eps(
 	vector<vector<int>> &units
 ){
@@ -169,38 +180,38 @@ void add_base_eps(
 	units.push_back({});
 }
 
-// debug
-void print_vec2(const vector<vector<int>> &vec2){
-	for(auto vec : vec2){
-		for(int val : vec){cout << val << " ";}
-		cout << endl;
-	}
-	cout << endl;
-}
-void print_vec2_score(const vector<vector<Score>> &vec2){
-	for(auto vec : vec2){
-		for(Score val : vec){cout << val.get_score() << " ";}
-		cout << endl;
-	}
-	cout << endl;
-}
-void print_vec3_score(vector<vector<vector<Score>>> vec){
-	for(int a = 0; a < (int)vec.size(); a++){
-		cout << "number " << a << ": " << endl;
-		for(vector<Score> inner_vec : vec[a]){
-			for(Score score : inner_vec){cout << setw(2) << setfill(' ') << score.get_score() << " ";}
-			cout << endl;
-		}
-	}
-	cout << endl;
-}
+// // debug
+// void print_vec2(const vector<vector<int>> &vec2){
+// 	for(auto vec : vec2){
+// 		for(int val : vec){cout << val << " ";}
+// 		cout << endl;
+// 	}
+// 	cout << endl;
+// }
+// void print_vec2_score(const vector<vector<Score>> &vec2){
+// 	for(auto vec : vec2){
+// 		for(Score val : vec){cout << val.get_score() << " ";}
+// 		cout << endl;
+// 	}
+// 	cout << endl;
+// }
+// void print_vec3_score(vector<vector<vector<Score>>> vec){
+// 	for(int a = 0; a < (int)vec.size(); a++){
+// 		cout << "number " << a << ": " << endl;
+// 		for(vector<Score> inner_vec : vec[a]){
+// 			for(Score score : inner_vec){cout << setw(2) << setfill(' ') << score.get_score() << " ";}
+// 			cout << endl;
+// 		}
+// 	}
+// 	cout << endl;
+// }
 
 
-/* ---------------- Naive EDDC ココカラ ---------------- */
+/* ---------------- Naive EDDC Starts from Here ---------------- */
 
-// 以下 "../eddc_original/eddc.h" からコピーして少し改変したもの
-// Stage1の計算(だいたい論文通り)
-// sとtは方向が逆なだけなので計算方法は同じ
+// Below are the almost same as in "../eddc_original/eddc.h"
+// Stage1 (Almost same as the original paper)
+// s and t are in reverse direction, so the calculation is the same
 void string_to_unit(
 	const vector<int> &s,
 	const vector<vector<int>> &units,
@@ -213,7 +224,7 @@ void string_to_unit(
 	int l = units.size();
 	if(n == 0){return;}
 	
-	// initialization
+	// Initialization
 	for(int i = 0; i < n; i++){
 		S_eps[i][i+1].set_zero();
 		S_eps[i][i+1].set_indel(1, params);
@@ -231,7 +242,7 @@ void string_to_unit(
 	// DP
 	for(int j = 2; j <= n; j++){
 		for(int i = j-2; i >= 0; i--){
-			// S2の更新
+			// Update S2
 			for(int a = 0; a < l; a++){
 				for(int h = i+1; h < j; h++){
 					Score tmp = min({
@@ -240,7 +251,7 @@ void string_to_unit(
 						params.get_dup(a) + S[a][i][h] + S[a][h][j]
 					});
 
-					// 元のアルゴリズムだとうまくいかないのでこの部分を追加
+					// Added the part below, for the original algorithm does not work well
 					if(j-i <= (int)units[a].size()){
 						tmp = min(tmp, edit_distance(s, units[a], params.mut_val(), params.indel_val(), i, j));
 					}
@@ -252,7 +263,7 @@ void string_to_unit(
 					}
 				}
 			}
-			// Sの更新
+			// Update S
 			for(int a = 0; a < l; a++){
 				for(int b = 0; b < l; b++){
 					if(S[a][i][j].get_score() < 0){
@@ -262,7 +273,7 @@ void string_to_unit(
 					}
 				}
 			}
-			// S_epsの更新
+			// Update S_eps
 			for(int a = 0; a < l; a++){
 				Score cand = min(params.get_dup(a) + S[a][i][j], params.get_indel(a) + S[a][i][j]);
 				if(S_eps[i][j].get_score() < 0){
@@ -322,7 +333,7 @@ Score calc_eddc(
 		ED[i][1] = S[t[0]][0][i];
 	}
 
-	// EDTの初期化(i=1)
+	// Initialization of EDT (i=1)
 	for(int a = 0; a < l; a++){
 		for(int j = 2; j < m+1; j++){
 			for(int h = 1; h < j; h++){
@@ -335,7 +346,7 @@ Score calc_eddc(
 	// DP
 	for(int j = 2; j <= m; j++){
 		for(int i = 2; i <= n; i++){
-			// EDTの更新
+			// Update EDT
 			for(int a = 0; a < l; a++){
 				for(int h = 1; h < j; h++){
 					if(EDT[a][i][j].get_score() < 0){
@@ -349,7 +360,7 @@ Score calc_eddc(
 					// cout << "T[a][h][j]: " << T[a][h][j].score << endl;
 				}
 			}
-			// EDの更新
+			// Update ED
 			for(int h = 1; h < i; h++){
 				for(int a = 0; a < l; a++){
 					Score tmp = min(S[a][0][i] + T[a][0][j], EDT[a][h][j] + S[a][h][i]);
@@ -376,10 +387,10 @@ Score calc_eddc(
 	return ED[n][m];
 }
 
-/* ---------------- Naive EDDC ココマデ ---------------- */
+/* ---------------- Naive EDDC Ends Here ---------------- */
 
 
-// eddc_unitsの作成（仮）（あとで共通化する）
+// Creates eddc_units（仮）（あとで共通化する）
 void shift_units(const vector<vector<int>> &units, vector<vector<int>> &eddc_units){
 	int ub_num = units.size();
 	int u_num = ub_num - 5;
@@ -398,8 +409,7 @@ void shift_units(const vector<vector<int>> &units, vector<vector<int>> &eddc_uni
 }
 
 void calc_f(
-	// reads は encoded reads のこと（あとで修正）
-	const vector<vector<int>> &reads,
+	const vector<vector<int>> &encodings,
 	const vector<vector<int>> &units,
 	const Params &params,
 	vector<vector<vector<vector<Score>>>> &f_scores,
@@ -407,18 +417,12 @@ void calc_f(
 	vector<long long> &measure_time
 ){
 	int ub_num = units.size();
-	int reads_num = reads.size();
+	int reads_num = encodings.size();
 	int eps = ub_num - 1;
 
 	// calc_eddc()の仕様上, eddc_unitsは[{bases}, {units}]の順番にする必要がある。これはあとで修正する。
 	vector<vector<int>> eddc_units;
 	shift_units(units, eddc_units);
-
-	// debug
-	// cout << "reads: " << endl;
-	// print_vec2(reads);
-	// cout << "eddc_units: " << endl;
-	// print_vec2(eddc_units);
 
 	auto c1c2_st = chrono::system_clock::now();
 
@@ -430,9 +434,6 @@ void calc_f(
 			c1[y][x] = c1[x][y];
 		}
 	}
-
-	// cout << "c1: " << endl;
-	// print_vec2_score(c1);
 
 	// c2[x,y,z]	: calc_eddc(xy,z)
 	vector<vector<vector<Score>>> c2(
@@ -494,7 +495,7 @@ void calc_f(
 
 	// f[w,b,e,z]
 	for(int w = 0; w < reads_num; w++){
-		int n = reads[w].size();
+		int n = encodings[w].size();
 
 		// dp[b,e,z]: f_scores[w][b,e,z] = Cost(w[b,e), z) = min_{b<k<=e}{min_{x\in U}{dp[b,k,x] + dp_sub[k,e,x,z]}}
 		// eをlen (= e-b) に変更
@@ -517,7 +518,7 @@ void calc_f(
 			// b+1 == eのとき, dp[b,e,z] = c1[b[b,e),z] = c1[b[b],z]
 			if(b != n){
 				for(int z = 0; z < ub_num; z++){
-					dp[b][1][z] = c1[reads[w][b]][z];
+					dp[b][1][z] = c1[encodings[w][b]][z];
 				}
 			}
 		}
@@ -553,26 +554,6 @@ void calc_f(
 		}
 
 		f_scores[w] = dp;
-
-		// debug
-		// if(w == 0){
-		// 	cout << "dp[0,*,*,0]: " << endl;
-		// 	for(const auto &vecs : dp){
-		// 		for(const auto &vec : vecs){
-		// 			if(vec[0] > 1e+300){cout << "   MAX";}
-		// 			else{cout << setw(6) << setfill(' ') << vec[0];}
-		// 		}
-		// 		cout << endl;
-		// 	}
-		// 	// cout << endl << "dp_sub[*,*,0,0]: " << endl;
-		// 	// for(const auto &vecs : dp_sub){
-		// 	// 	for(const auto &vec : vecs){
-		// 	// 		if(vec[0][0] > 1e+300){cout << "   MAX";}
-		// 	// 		else{cout << setw(6) << setfill(' ') << vec[0][0];}
-		// 	// 	}
-		// 	// 	cout << endl;
-		// 	// }
-		// }
 	}
 
 	auto f_dp_ed = chrono::system_clock::now();
