@@ -1,6 +1,0 @@
-132 msec
-132482 usec
-111 msec (c1,c2,valid_rules)
-12 msec (f_scores)
-7 msec (main dp)
-4600 KiB (mem use)

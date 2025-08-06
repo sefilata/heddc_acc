@@ -1,4 +1,0 @@
-{mut:0, indel:0, dup:}	{mut:0, indel:0, dup:(3, 1)}	{mut:1, indel:0, dup:}	{mut:1, indel:0, dup:(3, 3)}
-{mut:0, indel:0, dup:(3, 1)}	{mut:0, indel:0, dup:}	{mut:0, indel:0, dup:(3, 1)}	{mut:1, indel:0, dup:(3, 2)}
-{mut:1, indel:0, dup:}	{mut:0, indel:0, dup:(3, 1)}	{mut:0, indel:0, dup:}	{mut:0, indel:0, dup:(3, 3)}
-{mut:1, indel:0, dup:(3, 3)}	{mut:1, indel:0, dup:(3, 2)}	{mut:0, indel:0, dup:(3, 3)}	{mut:0, indel:0, dup:}

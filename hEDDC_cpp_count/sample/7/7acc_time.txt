@@ -1,5 +1,0 @@
-3878 msec
-3878041 usec
-3863 msec (c1,c2,valid_rules)
-9 msec (f_scores)
-4 msec (main dp)
