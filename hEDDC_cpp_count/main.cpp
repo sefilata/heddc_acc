@@ -203,11 +203,20 @@ int main(int argc, char* argv[]){
 	vector<vector<vector<int>>> decomposed_seqs;
 	string_decompose(reads, read_names, units, encodings, decomposed_seqs, encodings_file, e_flag);
 
+	// f score calculation limit length (setting minimum value of the limit)
+	int f_par = 5
+	int ulen_max = 0, ulen_min = INT_MAX;
+	for(auto &unit : units){
+		ulen_max = max(ulen_max, (int)unit.size());
+		ulen_min = min(ulen_min, (int)unit.size());
+	}
+	f_par = max(f_par, ulen_max/ulen_min + 1);
+
 	// Execute heddc_acc
 	vector<vector<Score>> scores;
 	vector<long long> measure_time;
 	auto start = chrono::high_resolution_clock::now();
-	heddc_all(encodings, units, params, scores, 5, measure_time);
+	heddc_all(encodings, units, params, scores, f_par, measure_time);
 	auto end = chrono::high_resolution_clock::now();
 	auto dur_msec = chrono::duration_cast<chrono::milliseconds>(end - start).count();
 	auto dur_usec = chrono::duration_cast<chrono::microseconds>(end - start).count();

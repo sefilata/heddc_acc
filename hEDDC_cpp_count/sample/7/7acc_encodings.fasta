@@ -1,0 +1,5 @@
+# units: (0, ATATATATATATAG) (1, AT) 
+> #seq1
+0 0 1 1 1 1 1 1 1 
+> #seq2
+1 1 1 1 1 1 1 0 0 
