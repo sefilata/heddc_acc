@@ -1,27 +1,37 @@
 #pragma once
 #include <iostream>
-#include <fstream>
 #include <vector>
 #include <chrono>
 #include <map>
 #include <set>
 #include <algorithm>
 #include <iomanip>
-#include <math.h>
+#include <cmath>
 #include <cfloat>
 #include <tuple>
 #include <compare>
+#include <chrono>
+#include <climits>
+#include <fstream>
+#include <string>
+#include <omp.h>
+#include <numeric>
+#include <sstream>
 
 #include "../string_decomposer/string_decomposer.h"
 #include "../eddc_original/fasta.h"
 
 using namespace std;
 
-//#define DEBUG
+const bool MEASURE_TIME = false;
+const bool MEASURE_MEMORY_LINUX = true;
+const bool DEBUG_OUT = false;
+const double PARAM_0_VALUE = 0.5; 	// 0: 0.5*unit_length
+const double PARAM_1_VALUE = 0.6; 	// 1: all
 
 class Params;
 
-// スコア構造体
+// Score class
 class Score{
 private:
 	double score;
@@ -32,46 +42,43 @@ public:
 	Score();
 	Score(double s);
 
-	// 各変数の追加
+	// Adding mutations
 	void set_indel(int len, const Params &par);
 	// void set_mut(const Params &par);
-	// void set_dup(int len, const Params &par);
+	// void set_dup(int unit_id, const Params &par);
 	void set_zero();
 
-	// 変数の取得
+	// Getting variables
 	double get_score() const;
 	int get_mut() const;
 	int get_indel() const;
-	void print_dup(ofstream &ofs, const vector<vector<int>> &units) const;
+	void print_dup(ostream& os, const vector<vector<int>> &units) const;
 
-	// edit_distance()とParamsのコンストラクタでのみ使用
+	// Adding mutations (used only in edit_distance() and Params constructor)
 	void set_indel_2(int len, double par);
 	void set_mut_2(double par);
 	void set_dup_2(int unit_id, double par);
 
-	// Score同士の加算
+	// Addition of Score
 	Score operator+(const Score &other) const;
-
-	// Score同士の加算代入
 	Score& operator+=(const Score &other);
 
-	// Score同士の順序
+	// Order of Score
 	auto operator<=>(const Score &other) const;
+	bool operator==(const Score &other) const;
 };
 
-// 従来の編集距離
+// Conventional edit distance
 Score edit_distance(const vector<int> &s, const vector<int> &t, double mut, double indel, int st = 0, int ed = -1);
 
-// パラメータ構造体
-// get_unit_to_unit() はこのままで良い？？
+// Params class functions
 class Params{
-private:
+public:
 	double mut, indel;
 	vector<vector<Score>> unit_to_unit;
 	vector<Score> dup_scores;
 	vector<Score> indel_scores;
 
-public:
 	Params(double m, double i, int dup_pattern, const vector<vector<int>> &units);
 
 	Score get_unit_to_unit(int i, int j) const;
@@ -80,30 +87,25 @@ public:
 
 	double mut_val() const;
 	double indel_val() const;
-	// double dup_val() const;
 
-	// 変異の追加
+	// Adding mutations
 	void set_indel(int len, const Params &par);
 	void set_mut(const Params &par);
 	void set_dup(int unit_id, const Params &par);
 };
 
-// unitsにbase (A,T,G,C)とepsilonを追加する
-void add_base_eps(
-	vector<vector<int>> &units
-);
+// DEBUG
+void print_vec2_score(const vector<vector<Score>> &vec2, const vector<vector<int>> &units);
 
-// debug
-void print_vec2(const vector<vector<int>> &vec2);
-void print_vec2_score(const vector<vector<Score>> &vec2);
-void print_vec3_score(vector<vector<vector<Score>>> vec);
+// Measure memory (Linux only)
+long long get_hwm_kb();
 
 
-/* ---------------- Naive EDDC ココカラ ---------------- */
+/* ---------------- Naive EDDC Starts Here ---------------- */
 
-// 以下 "../eddc_original/eddc.h" からコピーして少し改変したもの
-// Stage1の計算(だいたい論文通り)
-// sとtは方向が逆なだけなので計算方法は同じ
+// Stage1 (Almost the same as in the original paper)
+// The computations for s and t are the same
+// units: [{bases}. {units}, eps]
 void string_to_unit(
 	const vector<int> &s,
 	const vector<vector<int>> &units,
@@ -120,41 +122,45 @@ Score calc_eddc(
 	const Params &params
 );
 
-/* ---------------- Naive EDDC ココマデ ---------------- */
+/* ---------------- Naive EDDC Ends Here ---------------- */
 
 
-// eddc_unitsの作成（仮）（あとで共通化する）
-void shift_units(const vector<vector<int>> &units, vector<vector<int>> &eddc_units);
-
-// 初期化がたぶん足りない（？）
-// -> 大丈夫そう。たぶん。
+// heddc(s[i,j), x)
 void calc_f(
 	// reads は encoded reads のこと（あとで修正）
 	const vector<vector<int>> &reads,
 	const vector<vector<int>> &units,
 	const Params &params,
 	vector<vector<vector<vector<Score>>>> &f_scores,
-	vector<long long> &measure_time
+	const vector<int> &acc_par1s,
+	vector<long long> &measure_time,
+	vector<long long> &measure_mem
 );
 
-// 2本のTRとf_scoresが与えられたときにEDDCを計算する
+// Compute hEDDC given two TRs and f_scores
 Score calc_heddc(
-	// u, v は encoded read
-	const vector<int> &u,	// リード1
+	// u and v are unit-encoded sequences
+	const vector<int> &u,	// seq1
 	int u_idx,
-	const vector<int> &v,	// リード2
+	const vector<int> &v,	// seq2
 	int v_idx,
 	const vector<vector<int>> &units,
 	const Params &params,
-	const vector<vector<vector<vector<Score>>>> &f_scores
+	const vector<vector<vector<vector<Score>>>> &f_scores,
+	vector<int> acc_par1s, 	// length limits when computing f_score
+	int acc_par2 	// length limits when computing main dp (currently not used)
 );
 
-// 全てのTRの組に対してEDDCを計算する
+// Compute hEDDC for all TR pairs
 void heddc_all(
 	const vector<vector<int>> &encodings,
 	vector<vector<int>> &units,
 	const Params &params,
 	vector<vector<Score>> &scores,
-	vector<long long> &measure_time
+	int par,
+	vector<long long> &measure_time,
+	vector<long long> &measure_mem,
+	int parallel_num_1,
+	int parallel_num_2,
+	vector<int> &tr_nums
 );
-

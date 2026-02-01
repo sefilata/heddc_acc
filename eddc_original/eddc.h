@@ -9,6 +9,8 @@ using namespace std;
 
 //#define DEBUG
 
+// [Warning]: The codes below is not up-to-date and contains some critical issues.
+
 class Params;
 
 // スコア構造体

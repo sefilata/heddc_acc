@@ -1,0 +1,14 @@
+3 reads before compression
+3 reads after compression
+1 parallel (other than main dp)
+1 parallel (main dp)
+0 ACC_PATTERN (0:hEDDC, 1:heddc_acc)
+0 PARAMETER_PATTERN (0:0.5*|unit|, 1:all 0.6)
+5 msec
+5085 usec
+3 msec (c1,c2,valid_rules)
+1 msec (f_scores)
+0 msec (main dp)
+3752 kB MAX (after c1,c2, valid_rules)
+4072 kB MAX (after f_scores)
+4072 kB MAX (after main dp)

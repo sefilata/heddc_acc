@@ -1,34 +1,36 @@
-#include "hEDDC_acc_par1.h"
-
+#include "heddc_acc_parallel.h"
 
 // Constructor of Score
 Score::Score() : score(0), mut(0), indel(0), dup() {}
 Score::Score(double s) : score(s), mut(0), indel(0), dup() {}
 // Setting zero for Score
-void Score::set_zero(){score = 0;}
+void Score::set_zero(){score = 0; mut = 0; indel = 0; dup.clear();}
 // Getting variables in Score
 double Score::get_score() const {return score;}
 int Score::get_mut() const {return mut;}
 int Score::get_indel() const {return indel;}
-void Score::print_dup(ofstream &ofs, const vector<vector<int>> &units) const {
+void Score::print_dup(ostream& os, const vector<vector<int>> &units) const {
 	for(const auto &dup_ : dup){
 		if(dup_.second > 0){
 			if(dup_.first < 4){
-				cerr << "Warning: print_dup() called with unit_id < 4, which is not expected." << endl;
+				// cerr << "Warning: print_dup() called with unit_id < 4, which is not expected." << endl;
+				os << "(";
+				os << base_map_reverse[dup_.first];
+				os << ", " << dup_.second << ")";
 				continue;
 			}
-			ofs << "(";
+			os << "(";
 			string unit_str;
-			digits_to_string(units[dup_.first - 4], unit_str);
-			ofs << unit_str;
-			ofs << ", " << dup_.second << ")";
+			digits_to_string(units[dup_.first], unit_str);
+			os << unit_str;
+			os << ", " << dup_.second << ")";
 		}
 	}
 }
 // Used only in edit_distance() and Constructor of Params
 void Score::set_indel_2(int len, double par){score += par * len; indel += len;}
 void Score::set_mut_2(double par){score += par; mut++;}
-void Score::set_dup_2(int unit_id, double par){score += par; dup.emplace(unit_id, 1);}
+void Score::set_dup_2(int unit_id, double par){score += par;; dup.emplace(unit_id, 1);}
 // Addition of Scores
 Score Score::operator+(const Score &other) const{
 	if(score < 0 || other.score < 0){cerr << "Error: operator + for minus scores" << endl;}
@@ -65,29 +67,17 @@ Score& Score::operator+=(const Score &other){
 auto Score::operator<=>(const Score &other) const{
 	return score <=> other.score;
 }
+bool Score::operator==(const Score& other) const {
+	return fabs(score - other.score) < 1e-12;
+}
 // Setting indel, mutation, duplication/contraction
 void Score::set_indel(int len, const Params &par){
 	if(score < 0){cerr << "Error: set_indel for minus scores" << endl;}
 	score += par.indel_val() * len;
 	indel += len;
 }
-// Not used (for what?? I forgot..)
-// void Score::set_mut(const Params &par){
-// 	if(score < 0){cerr << "Error: set_mut for minus scores" << endl;}
-// 	score += par.mut_val();
-// 	mut++;
-// }
-// void Score::set_dup(int unit_id, const Params &par){
-// 	if(score < 0){cerr << "Error: set_dup for minus scores" << endl;}
-// 	score += par.dup_val() * len;
-// 	if(dup.find(unit_id) == dup.end()){
-// 		dup.emplace(unit_id, 1);
-// 	}else{
-// 		dup[unit_id]++;
-// 	}
-// }
 
-// 従来の編集距離
+// Conventional edit distance: ed(s[st,ed), t)
 Score edit_distance(const vector<int> &s, const vector<int> &t, double mut, double indel, int st, int ed){
 	if(ed == -1){ed = s.size();}
 	int n = ed - st;
@@ -98,7 +88,7 @@ Score edit_distance(const vector<int> &s, const vector<int> &t, double mut, doub
 	for(int i = 0; i <= m; i++){dp[0][i].set_indel_2(i, indel);}
 	
 	for(int i = 1; i <= n; i++){for(int j = 1; j <= m; j++){
-		double mut_ij = (s[st+i-1] == t[j-1]) ? 0.0 : mut;
+		double mut_ij =(s[st+i-1] == t[j-1]) ? 0.0 : mut;
 		double score_ij = min({
 			dp[i-1][j-1].get_score() + mut_ij,
 			dp[i-1][j].get_score() + indel,
@@ -120,33 +110,30 @@ Score edit_distance(const vector<int> &s, const vector<int> &t, double mut, doub
 }
 
 // Params class functions
-// dup_pattern ... 0: 0.5*unit_length, 1: all 0.5
+// dup_pattern ... 0: PARAM_0_VALUE*unit_length, 1: all PARAM_1_VALUE
+// units: [{bases}. {units}, eps]
 Params::Params(double m, double i, int dup_pattern, const vector<vector<int>> &units){
 	int unit_num = units.size();
 	mut = m;
 	indel = i;
 
-	// Dup score of each unit (regards dup/cont of a single unit as a indel, if not the base is included in units)
+	// Dup score of each unit (regarding dup/cont of a single unit as indel, if the base is not included as units)
 	dup_scores.resize(unit_num, Score(0.0));
 	for(int i = 0; i < unit_num; i++){
 		if(i < 4){
 			dup_scores[i].set_indel_2(1, indel);
 		}else{
-			if(dup_pattern == 0) dup_scores[i].set_dup_2(i, 0.5 * units[i].size());
-			else if(dup_pattern == 1) dup_scores[i].set_dup_2(i, 0.5);
+			if(dup_pattern == 0) dup_scores[i].set_dup_2(i, PARAM_0_VALUE * units[i].size());
+			else if(dup_pattern == 1) dup_scores[i].set_dup_2(i, PARAM_1_VALUE);
 			else cerr << "Error: invalid dup_pattern" << endl;
 		}
 	}
 
-	// (unit, base) -> (unit, base)
-	// 250424 適当に変えた。要確認。（重複の許可）
-	unit_to_unit.resize(unit_num, vector<Score>(units.size()));
+	// ed(x, y): これいらないかも？最後に要確認
+	unit_to_unit.resize(unit_num, vector<Score>(unit_num));
 	for(int i = 0; i < unit_num; i++){
 		for(int j = i; j < unit_num; j++){
-			unit_to_unit[i][j] = min(
-				edit_distance(units[i], units[j], mut, indel),
-				dup_scores[i] + dup_scores[j]
-			);
+			unit_to_unit[i][j] = edit_distance(units[i], units[j], mut, indel);
 			unit_to_unit[j][i] = unit_to_unit[i][j];
 		}
 	}
@@ -168,50 +155,48 @@ Score Params::get_indel(int a) const {
 }
 double Params::mut_val() const {return mut;}
 double Params::indel_val() const {return indel;}
-// double Params::dup_val() const {return dup;}
 
-// Adds bases(A,T,G,C) and epsilon to units
-void add_base_eps(
-	vector<vector<int>> &units
-){
-	for(int i = 0; i < 4; i++){
-		units.push_back({i});
+// DEBUG
+void print_vec2_score(const vector<vector<Score>> &vec2, const vector<vector<int>> &units){
+	for(auto vec : vec2){
+		for(Score val : vec){cout << val.get_score() << " ";}
+		cout << endl;
 	}
-	units.push_back({});
+	cout << "variants" << endl;
+	for(auto vec : vec2){
+		for(Score val : vec){
+			cout << "{mut:" << val.get_mut();
+			cout << ", indel:" << val.get_indel();
+			cout << ", dup:";
+			val.print_dup(cout, units);
+			cout << "} ";
+		}
+		cout << endl;
+	}
+	cout << endl;
 }
 
-// // debug
-// void print_vec2(const vector<vector<int>> &vec2){
-// 	for(auto vec : vec2){
-// 		for(int val : vec){cout << val << " ";}
-// 		cout << endl;
-// 	}
-// 	cout << endl;
-// }
-// void print_vec2_score(const vector<vector<Score>> &vec2){
-// 	for(auto vec : vec2){
-// 		for(Score val : vec){cout << val.get_score() << " ";}
-// 		cout << endl;
-// 	}
-// 	cout << endl;
-// }
-// void print_vec3_score(vector<vector<vector<Score>>> vec){
-// 	for(int a = 0; a < (int)vec.size(); a++){
-// 		cout << "number " << a << ": " << endl;
-// 		for(vector<Score> inner_vec : vec[a]){
-// 			for(Score score : inner_vec){cout << setw(2) << setfill(' ') << score.get_score() << " ";}
-// 			cout << endl;
-// 		}
-// 	}
-// 	cout << endl;
-// }
+// Measure memory (Linux only)
+long long get_hwm_kb(){
+	ifstream f("/proc/self/status");
+	string line;
+	while(getline(f, line)){
+		if(line.rfind("VmHWM:", 0) == 0){
+			long long v; string unit;
+			istringstream iss(line.substr(6));
+			iss >> v >> unit;
+			return v; 	// kB
+		}
+	}
+	return -1; 	// error
+}
 
 
-/* ---------------- Naive EDDC Starts from Here ---------------- */
+/* ---------------- Naive EDDC Starts Here ---------------- */
 
-// Below are the almost same as in "../eddc_original/eddc.h"
-// Stage1 (Almost same as the original paper)
-// s and t are in reverse direction, so the calculation is the same
+// Stage1 (Almost the same as in the original paper)
+// The computations for s and t are the same
+// units: [{bases}. {units}, eps]
 void string_to_unit(
 	const vector<int> &s,
 	const vector<vector<int>> &units,
@@ -222,6 +207,7 @@ void string_to_unit(
 ){
 	int n = s.size();
 	int l = units.size();
+	// int eps = l - 1;
 	if(n == 0){return;}
 	
 	// Initialization
@@ -232,12 +218,6 @@ void string_to_unit(
 			S[a][i][i+1] = params.get_unit_to_unit(a, s[i]);
 		}
 	}
-	// for(int i = 0; i <= n; i++){
-	// 	S_eps[i][i].set_zero();
-	// 	for(int a = 0; a < l; a++){
-	// 		S[a][i][i] = params.get_dup(a);
-	// 	}
-	// }
 	
 	// DP
 	for(int j = 2; j <= n; j++){
@@ -252,9 +232,11 @@ void string_to_unit(
 					});
 
 					// Added the part below, for the original algorithm does not work well
-					if(j-i <= (int)units[a].size()){
-						tmp = min(tmp, edit_distance(s, units[a], params.mut_val(), params.indel_val(), i, j));
-					}
+					// I'm not sure how long it should be computed..
+					// if(j-i <= (int)units[a].size()){
+					// 	tmp = min(tmp, edit_distance(s, units[a], params.mut_val(), params.indel_val(), i, j));
+					// }
+					tmp = min(tmp, edit_distance(s, units[a], params.mut_val(), params.indel_val(), i, j));
 
 					if(S2[a][i][j].get_score() < 0){
 						S2[a][i][j] = tmp;
@@ -275,7 +257,7 @@ void string_to_unit(
 			}
 			// Update S_eps
 			for(int a = 0; a < l; a++){
-				Score cand = min(params.get_dup(a) + S[a][i][j], params.get_indel(a) + S[a][i][j]);
+				Score cand = params.get_indel(a) + S[a][i][j];
 				if(S_eps[i][j].get_score() < 0){
 					S_eps[i][j] = cand;
 				}else{
@@ -309,20 +291,13 @@ Score calc_eddc(
 	
 	// Stage1
 	string_to_unit(s, units, S_eps, S, S2, params);
-	// if(n == 3 && s[1] == 3 && t[0] == 1){print_vec3_score(S);}
-	// print_vec2(S_eps);
-	// print_vec3(S);
-	// print_vec3(S2);
 	string_to_unit(t, units, T_eps, T, T2, params);
-	// cout << "T_eps "; print_vec2(T_eps);
-	// cout << "T "; print_vec3(T);
-	// cout << "T2 "; print_vec3(T2);
 
 	if(n == 0){return T_eps[0][m];}
 	if(m == 0){return S_eps[0][n];}
 
 	// Stage2
-	// Initialization
+	// Initialization of ED
 	ED[0][0].set_zero();
 	for(int i = 1; i < m+1; i++){
 		ED[0][i] = T_eps[0][i];
@@ -333,7 +308,7 @@ Score calc_eddc(
 		ED[i][1] = S[t[0]][0][i];
 	}
 
-	// Initialization of EDT (i=1)
+	// Initialization of EDT(i=1)
 	for(int a = 0; a < l; a++){
 		for(int j = 2; j < m+1; j++){
 			for(int h = 1; h < j; h++){
@@ -354,10 +329,6 @@ Score calc_eddc(
 					}else{
 						EDT[a][i][j] = min(EDT[a][i][j], ED[i][h] + T[a][h][j]);
 					}
-					
-					// cout << "EDT[a][i][j]: " << EDT[a][i][j].score << endl;
-					// cout << "ED[i][h]: " << ED[i][h].score << endl;
-					// cout << "T[a][h][j]: " << T[a][h][j].score << endl;
 				}
 			}
 			// Update ED
@@ -369,20 +340,10 @@ Score calc_eddc(
 					}else{
 						ED[i][j] = min(ED[i][j], tmp);
 					}
-					
-					// cout << "(i,j,h,a)=(" << i << "," << j << "," << h << "," << a << ")" << endl;
-					// cout << "S[a][0][i]: " << S[a][0][i].score << endl;
-					// cout << "T[a][0][j]: " << T[a][0][j].score << endl;
-					// cout << "EDT[a][h][j]: " << EDT[a][h][j].score << endl;
-					// cout << "S[a][h][i]: " << S[a][h][i].score << endl;
-					// cout << endl;
 				}
 			}
 		}
 	}
-	
-	// cout << "ED "; print_vec2(ED);
-	// cout << "EDT "; print_vec3(EDT);
 	
 	return ED[n][m];
 }
@@ -390,85 +351,100 @@ Score calc_eddc(
 /* ---------------- Naive EDDC Ends Here ---------------- */
 
 
-// Creates eddc_units（仮）（あとで共通化する）
-void shift_units(const vector<vector<int>> &units, vector<vector<int>> &eddc_units){
-	int ub_num = units.size();
-	int u_num = ub_num - 5;
-
-	eddc_units.clear();
-	eddc_units.reserve(ub_num - 1);
-
-	// bases
-	for(int i = 0; i < 4; i++){
-		eddc_units.push_back({i});
-	}
-	// units
-	for(int i = 0; i < u_num; i++){
-		eddc_units.push_back(units[i]);
-	}
-}
-
+// heddc(s[i,j), x) for any combination of s\in{Encoded TR},x\in{Units},i,j
 void calc_f(
 	const vector<vector<int>> &encodings,
 	const vector<vector<int>> &units,
 	const Params &params,
 	vector<vector<vector<vector<Score>>>> &f_scores,
-	vector<int> acc_par1s,
-	vector<long long> &measure_time
+	const vector<int> &acc_par1s,
+	vector<long long> &measure_time,
+	vector<long long> &measure_mem
 ){
 	int ub_num = units.size();
 	int reads_num = encodings.size();
 	int eps = ub_num - 1;
 
-	// calc_eddc()の仕様上, eddc_unitsは[{bases}, {units}]の順番にする必要がある。これはあとで修正する。
-	vector<vector<int>> eddc_units;
-	shift_units(units, eddc_units);
-
 	auto c1c2_st = chrono::system_clock::now();
 
-	// c1[x,y]		: calc_eddc(x,y)
+	// Rank the lengths of units for load leveling
+	vector<int> lengths_rank(ub_num);
+	iota(lengths_rank.begin(), lengths_rank.end(), 0);
+	sort(lengths_rank.begin(), lengths_rank.end(), [&](int a, int b){
+		return units[a].size() > units[b].size();
+	});
+
+	// c1[x,y] 	: calc_eddc(x,y)
+	if(DEBUG_OUT){
+		auto now = chrono::system_clock::now();
+		time_t t = chrono::system_clock::to_time_t(now);
+		cout << "Started calc-c1 at " << ctime(&t);
+		cout.flush();
+	}
 	vector<vector<Score>> c1(ub_num, vector<Score>(ub_num, Score(0.0)));
-	for(int x = 0; x < ub_num; x++){
-		for(int y = x+1; y < ub_num; y++){
-			c1[x][y] = calc_eddc(units[x], units[y], eddc_units, params);
-			c1[y][x] = c1[x][y];
-		}
+	#pragma omp parallel for schedule(dynamic)
+	for(int xy = 0; xy < ub_num*ub_num; xy++){
+		int x = lengths_rank[xy / ub_num];
+		int y = lengths_rank[xy % ub_num];
+		if(x < 4 || y < 4 || x >= y){continue;} 	// Compute only for units and eps (excluding bases).
+		c1[x][y] = calc_eddc(units[x], units[y], units, params);
+		c1[y][x] = c1[x][y];
 	}
 
-	// c2[x,y,z]	: calc_eddc(xy,z)
+	// c2[x,y,z] 	: calc_eddc(xy,z)
+	if(DEBUG_OUT){
+		auto now = chrono::system_clock::now();
+		time_t t = chrono::system_clock::to_time_t(now);
+		cout << "Started calc-c2 at " << ctime(&t);
+		cout.flush();
+	}
 	vector<vector<vector<Score>>> c2(
 		ub_num, vector<vector<Score>>(
 			ub_num, vector<Score>(ub_num, Score(DBL_MAX)))
 	);
-	for(int x = 0; x < ub_num; x++){
-		for(int y = 0; y < ub_num; y++){
-			for(int z = 0; z < ub_num; z++){
-				vector<int> xy;
-				xy.reserve(units[x].size() + units[y].size());
-				xy.insert(xy.end(), units[x].begin(), units[x].end());
-				xy.insert(xy.end(), units[y].begin(), units[y].end());
-				c2[x][y][z] = calc_eddc(xy, units[z], eddc_units, params);
-			}
+	#pragma omp parallel for schedule(dynamic)
+	for(int xyz = 0; xyz < ub_num*ub_num*ub_num; xyz++){
+		int x = lengths_rank[xyz /(ub_num * ub_num)];
+		int y = lengths_rank[(xyz / ub_num) % ub_num];
+		int z = lengths_rank[xyz % ub_num];
+		if(x < 4 || y < 4 || z < 4){continue;}
+		// 2025-11-27 	In the case x==y==z, omit the computation.（Warn: It could be inappropriate for certain parameter settings.）
+		if(x == y && y == z){
+			c2[x][y][z] = params.get_dup(x);
+			continue;
 		}
+		vector<int> xy;
+		xy.reserve(units[x].size() + units[y].size());
+		xy.insert(xy.end(), units[x].begin(), units[x].end());
+		xy.insert(xy.end(), units[y].begin(), units[y].end());
+		c2[x][y][z] = calc_eddc(xy, units[z], units, params);
 	}
 
 	auto c1c2_ed = chrono::system_clock::now();
 	auto c1c2 = chrono::duration_cast<chrono::milliseconds>(c1c2_ed - c1c2_st).count();
 	if(MEASURE_TIME){cout << "calc c1, c2: " << c1c2 << " msec" << endl;}
 
-	// cout << "c2: " << endl;
-	// print_vec3_score(c2);
-
 	// valid_rules	: xy -> z st. \forall {p,q} {eddc(xy, z) <= eddc(x,p) + eddc(y,q) + eddc(pq,z)}
-	// 各valid_rule xy -> z に対して、<x,z>のsetと<x,y,z>のset
+	// For each valid_rule xy -> z, store the set of <x,z> and <x,y,z>
+	if(DEBUG_OUT){
+		auto now = chrono::system_clock::now();
+		time_t t = chrono::system_clock::to_time_t(now);
+		cout << "Started valid-rules at " << ctime(&t);
+		cout.flush();
+	}
 	set<pair<int,int>> valid_rules_xz;
 	set<tuple<int,int,int>> valid_rules_xyz;
 	for(int x = 0; x < ub_num; x++){
+		if(x < 4){continue;}
 		for(int y = 0; y < ub_num; y++){
+			if(y < 4){continue;}
 			for(int z = 0; z < ub_num; z++){
+				if(z < 4){continue;}
 				bool is_redundant = false;
 				for(int p = 0; p < ub_num; p++){
+					if(p < 4){continue;}
 					for(int q = 0; q < ub_num; q++){
+						if(q < 4){continue;}
 						if(p == x && q == y){continue;}
 						if(c2[x][y][z] >= c1[x][p] + c1[y][q] + c2[p][q][z]){
 							is_redundant = true;
@@ -489,35 +465,45 @@ void calc_f(
 	auto vrule = chrono::duration_cast<chrono::milliseconds>(vrule_ed - c1c2_ed).count();
 	if(MEASURE_TIME){cout << "valid rules: " << vrule << " msec" << endl;}
 	measure_time[0] = chrono::duration_cast<chrono::milliseconds>(vrule_ed - c1c2_st).count();
+	if(MEASURE_MEMORY_LINUX) measure_mem[0] = get_hwm_kb();
 
-	// cout << "calc valid" << endl;
-	// for(auto &[x,y,z] : valid_rules_xyz){cout << x << y << z << endl;}
-
-	// f[w,b,e,z]
+	// f[w,b,e,z] = heddc(w[b,e),z)
+	if(DEBUG_OUT){
+		auto now = chrono::system_clock::now();
+		time_t t = chrono::system_clock::to_time_t(now);
+		cout << "Started f-scores at " << ctime(&t);
+		cout.flush();
+	}
+	#pragma omp parallel for schedule(dynamic)
 	for(int w = 0; w < reads_num; w++){
 		int n = encodings[w].size();
+		int tab_size = min(n, acc_par1s[w])+1;
 
 		// dp[b,e,z]: f_scores[w][b,e,z] = Cost(w[b,e), z) = min_{b<k<=e}{min_{x\in U}{dp[b,k,x] + dp_sub[k,e,x,z]}}
-		// eをlen (= e-b) に変更
+		// eをlen(= e-b) に変更
 		vector<vector<vector<Score>>> dp(
 			n+1, vector<vector<Score>>(
-				acc_par1s[w]+1, vector<Score>(ub_num, Score(DBL_MAX)))
+				tab_size, vector<Score>(ub_num, Score(DBL_MAX)))
 		);
 		// dp_sub[k,e,x,z] = min_{y\in U}{f[w,k,e,y] + eddc(xy,z)}
-		// eをlen (= e-k) に変更
+		// eをlen(= e-k) に変更
 		vector<vector<vector<vector<Score>>>> dp_sub(
 			n+1, vector<vector<vector<Score>>>(
-				acc_par1s[w]+1, vector<vector<Score>>(
+				tab_size, vector<vector<Score>>(
 					ub_num, vector<Score>(ub_num, Score(DBL_MAX))))
 		);
 
 		// Initialization of dp
 		for(int b = 0; b < n+1; b++){
-			// b == eのとき, dp[b,e,z] = c1[eps,z]
-			for(int z = 0; z < ub_num; z++){dp[b][0][z] = c1[eps][z];}
-			// b+1 == eのとき, dp[b,e,z] = c1[b[b,e),z] = c1[b[b],z]
+			// Case b == e, dp[b,e,z] = c1[eps,z]
+			for(int z = 0; z < ub_num; z++){
+				if(z < 4){continue;}
+				dp[b][0][z] = c1[eps][z];
+			}
+			// Case b+1 == e, dp[b,e,z] = c1[b[b,e),z] = c1[b[b],z]
 			if(b != n){
 				for(int z = 0; z < ub_num; z++){
+					if(z < 4){continue;}
 					dp[b][1][z] = c1[encodings[w][b]][z];
 				}
 			}
@@ -527,8 +513,11 @@ void calc_f(
 		for(int b = 0; b < n+1; b++){
 			for(int len = 0; len < 2 && b+len < n+1; len++){
 				for(int z = 0; z < ub_num; z++){
+					if(z < 4){continue;}
 					for(int x = 0; x < ub_num; x++){
+						if(x < 4){continue;}
 						for(int y = 0; y < ub_num; y++){
+							if(y < 4){continue;}
 							dp_sub[b][len][x][z] = min(dp_sub[b][len][x][z], dp[b][len][y] + c2[x][y][z]);
 						}
 					}
@@ -536,8 +525,8 @@ void calc_f(
 			}
 		}
 
-		// DP (CYK-like algorithm)
-		for(int len = 2; len < acc_par1s[w]+1; len++){
+		// DP(CYK-like algorithm)
+		for(int len = 2; len < min(n, acc_par1s[w])+1; len++){
 			for(int b = 0; b < n+1-len; b++){
 				// dp[b,e,z] = min_{b<k<=e}{min_{x\in U}{dp[b,k,x] + dp_sub[k,e,x,z]}}
 				// kをbからのindexに変更
@@ -559,27 +548,29 @@ void calc_f(
 	auto f_dp_ed = chrono::system_clock::now();
 	auto f_dp = chrono::duration_cast<chrono::milliseconds>(f_dp_ed - vrule_ed).count();
 	if(MEASURE_TIME){cout << "f main dp: " << f_dp << " msec" << endl;}
+	if(MEASURE_MEMORY_LINUX) measure_mem[1] = get_hwm_kb();
 	measure_time[1] = f_dp;
 }
 
-// 2本のTRとf_scoresが与えられたときにEDDCを計算する
+// Compute hEDDC given two TRs and f_scores
 Score calc_heddc(
-	// u, v は encoded read
-	const vector<int> &u,	// リード1
+	// u and v are unit-encoded sequences
+	const vector<int> &u,	// seq1
 	int u_idx,
-	const vector<int> &v,	// リード2
+	const vector<int> &v,	// seq2
 	int v_idx,
 	const vector<vector<int>> &units,
 	const Params &params,
 	const vector<vector<vector<vector<Score>>>> &f_scores,
-	vector<int> acc_par1s,		// f_score計算時の最大長さ
-	int acc_par2 	// main dpでの最大長さ
+	vector<int> acc_par1s, 	// length limits when computing f_score
+	int acc_par2 	// length limits when computing main dp (currently not used)
 ){
 	int n = u.size();
 	int m = v.size();
 	int ub_num = units.size();
+	// int eps = ub_num - 1;
 
-	// dp[i,j] = Cost(u[0,i), v[0,j))
+	// dp[i,j] = heddc(u[0,i), v[0,j))
 	vector<vector<Score>> dp(n+1, vector<Score>(m+1, Score(DBL_MAX)));
 	// dp_sub[p,j,x] = min_{0<=q<j}{dp[p,q] + f[v,q,j,x]}
 	vector<vector<vector<Score>>> dp_sub(n+1, vector<vector<Score>>(m+1, vector<Score>(ub_num, Score(DBL_MAX))));
@@ -593,11 +584,12 @@ Score calc_heddc(
 			if(abs(i - j) > acc_par2){continue;}
 			// dp_sub[i,j,x]
 			for(int x = 0; x < ub_num; x++){
+				if(x < 4){continue;}
 				Score val(DBL_MAX);
 				// dp_sub[p,j,x] = min_{0<=q<j}{dp[p,q] + f[v,q,j,x]}	(p=i)
-				for(int q = max(0, j-acc_par1s[v_idx]); q <= j; q++){	// とにかくf[-,q,j,-]で[q,j)の長さをacc_par1で制限すればよい
+				for(int q = max(0, j-acc_par1s[v_idx]); q <= j; q++){ 	// Limit the length of [q,j) in f[-,q,j,-] by acc_par1
 					if(abs(i - q) > acc_par2){continue;}
-					// i==p && j==q のときはDBL_MAXのままなのでスキップできる
+					// In case i==p && j==q, it is skipped since val remains to be DBL_MAX
 					val = min(val, dp[i][q] + f_scores[v_idx][q][j-q][x]);
 				}
 				dp_sub[i][j][x] = val;
@@ -606,6 +598,7 @@ Score calc_heddc(
 			// dp[i,j] = min_{x\in U}{min_{0<=p<i}{f[u,p,i,x] + dp_sub[p,j,x]}}
 			Score val(DBL_MAX);
 			for(int x = 0; x < ub_num; x++){
+				if(x < 4){continue;}
 				for(int p = max(0, i-acc_par1s[u_idx]); p <= i; p++){
 					if(abs(p - j) > acc_par2){continue;}
 					val = min(val, f_scores[u_idx][p][i-p][x] + dp_sub[p][j][x]);
@@ -618,66 +611,119 @@ Score calc_heddc(
 	return dp[n][m];
 }
 
-// 全てのTRの組に対してEDDCを計算する
+// Compute hEDDC for all TR pairs
 void heddc_all(
 	const vector<vector<int>> &encodings,
 	vector<vector<int>> &units,
 	const Params &params,
 	vector<vector<Score>> &scores,
 	int par,
-	vector<long long> &measure_time 	// c1 c2 v_rules, f, maind dp の実行時間
+	vector<long long> &measure_time, 	// Computation times of c1_c2 v_rules, f, main_dp
+	vector<long long> &measure_mem, 	// Max memory consumption when c1_c2, f, or main_dp finished
+	int parallel_num_1, 	// # of threads other than main dp
+	int parallel_num_2, 	// # of threads in main dp
+	vector<int> &tr_nums 	// # of sequences before and after compression (consolidation of seqs with identical unit decompositions)
 ){
 	int tr_num = encodings.size();
 	measure_time.resize(3);
+	omp_set_num_threads(parallel_num_1);
 
-	// f_scores計算時の最大長さ
-	// 最小値を設定
-	int acc_par1 = par;
-	// acc1を [encoding長 / 最短encoding長] を基準にする
-	int min_enc_len = INT_MAX;
-	for(const auto &enc : encodings){
-		if((int)enc.size() < min_enc_len){min_enc_len = enc.size();}
-	}
-	min_enc_len = max(1, min_enc_len-1);    // バッファ (& 0にならないように)
-	vector<int> acc_par1s(tr_num);
+	// skip calculating for same encodings
+	// calculating index when compressed
+	vector<int> index_map(tr_num, -1); 	// index when compressed
+	int tr_num_compressed = 0;
 	for(int i = 0; i < tr_num; i++){
-		acc_par1s[i] = max(acc_par1, int(encodings[i].size() / min_enc_len));
-		acc_par1s[i] = max(acc_par1s[i], (int)encodings[i].size() - min_enc_len);
+		bool found = false;
+		for(int j = 0; j < i; j++){
+			if(encodings[i] != encodings[j]) continue;
+			index_map[i] = index_map[j];
+			found = true;
+			break;
+		}
+		if(found) continue;
+		index_map[i] = tr_num_compressed;
+		tr_num_compressed++;
 	}
-	// // main dpでの最大長さ (が[read長の差 / 最小ユニット長]の何倍か)
-	// // enc長の差の何倍かに変更
-	// double acc_par2_ratio = (double)INT_MAX / 10.0;
-	// int min_unit_len = INT_MAX;
-	// for(const auto &unit : units){
-	// 	if(unit.size() < min_unit_len){min_unit_len = unit.size();}
-	// }
-
-	// unitsにbaseとepsを追加する
-	add_base_eps(units);
-	// int ub_num = units.size();
-
-	// f[u,b,e,x] = Pr(u[b,e) -> x)
-	// 各u (read) に対してfを計算する
-	vector<vector<vector<vector<Score>>>> f_scores(tr_num);
-	calc_f(encodings, units, params, f_scores, acc_par1s, measure_time);
-
-	// 各組み合わせについてheddcを実行する
-	scores.assign(tr_num, vector<Score>(tr_num, Score(0.0)));
-	auto dp_st = chrono::system_clock::now();
+	if(DEBUG_OUT) cout << "[INFO] tr_num: " << tr_num << endl;
+	if(DEBUG_OUT) cout << "[INFO] tr_num_compressed: " << tr_num_compressed << endl;
+	// create compressed encodings vector
+	vector<vector<int>> encodings_compressed(tr_num_compressed);
+	vector<bool> filled(tr_num_compressed, false);
 	for(int i = 0; i < tr_num; i++){
-		for(int j = i+1; j < tr_num; j++){
-			// int acc_par2 = int(
-			// 	abs((int)encodings[i].size() - (int)encodings[j].size()) * acc_par2_ratio
-			// );
-			// acc_par2 = max(acc_par2, int((double)max(encodings[i].size(), encodings[j].size())/5));
-			// double val = calc_heddc(encodings[i], i, encodings[j], j, units, params, f_scores, acc_par1s, acc_par2);
-			Score val = calc_heddc(encodings[i], i, encodings[j], j, units, params, f_scores, acc_par1s, INT_MAX);
-			scores[i][j] = val;
-			scores[j][i] = scores[i][j];
+		if(filled[index_map[i]]) continue;
+		encodings_compressed[index_map[i]] = encodings[i];
+		filled[index_map[i]] = true;
+	}
+
+	// Length limits for f_scores computations
+	// Setting the minimum value of length limits
+	vector<int> acc_par1s(tr_num_compressed, par);
+	// par == INT_MAX if ACC_PATTERN is 0
+	if(par != INT_MAX){
+		// (i) TRs containing corresponding repeats with largely different lengths.
+		// acc1 is set to [{length of target encoding} / {length of shortest encoding}]
+		// (ii) A TR contains units that are absent in the other TR.
+		// acc1 is set to [{length of target encoding} - {length of shortest encoding}]
+		int min_enc_len = INT_MAX;
+		for(const auto &enc : encodings_compressed){
+			if((int)enc.size() < min_enc_len){min_enc_len = enc.size();}
+		}
+		min_enc_len = max(1, min_enc_len-1);	// Buffer & avoiding 0-division
+		for(int i = 0; i < tr_num_compressed; i++){
+			acc_par1s[i] = max(acc_par1s[i], int(encodings_compressed[i].size() / min_enc_len));
+			acc_par1s[i] = max(acc_par1s[i],(int)encodings_compressed[i].size() - min_enc_len);
 		}
 	}
+
+	// f[u,b,e,x] = heddc(u[b,e), x)
+	// Compute f for each u \in{encoded TRs}
+	vector<vector<vector<vector<Score>>>> f_scores(tr_num);
+	calc_f(encodings_compressed, units, params, f_scores, acc_par1s, measure_time, measure_mem);
+
+	// Rank the lengths of units for leveling the loads
+	vector<int> lengths_rank(tr_num_compressed);
+	iota(lengths_rank.begin(), lengths_rank.end(), 0);
+	sort(lengths_rank.begin(), lengths_rank.end(), [&](int a, int b){
+		return encodings_compressed[a].size() > encodings_compressed[b].size();
+	});
+
+	// Compute main_dp of heddc
+	omp_set_num_threads(parallel_num_2);
+	if(DEBUG_OUT){
+		auto now = chrono::system_clock::now();
+		time_t t = chrono::system_clock::to_time_t(now);
+		cout << "Started main-dp at " << ctime(&t);
+		cout.flush();
+	}
+	vector<vector<Score>> scores_compressed(tr_num_compressed);
+	scores_compressed.assign(tr_num_compressed, vector<Score>(tr_num_compressed, Score(0.0)));
+	auto dp_st = chrono::system_clock::now();
+	#pragma omp parallel for schedule(dynamic)
+	for(int ij = 0; ij < tr_num_compressed * tr_num_compressed; ij++){
+		int i = lengths_rank[ij / tr_num_compressed];
+		int j = lengths_rank[ij % tr_num_compressed];
+		if(i >= j){continue;}
+
+		Score val = calc_heddc(encodings_compressed[i], i, encodings_compressed[j], j, units, params, f_scores, acc_par1s, INT_MAX);
+
+		scores_compressed[i][j] = val;
+		scores_compressed[j][i] = scores_compressed[i][j];
+	}
+
+	// Scores
+	scores.assign(tr_num, vector<Score>(tr_num, Score(0.0)));
+	#pragma omp parallel for schedule(dynamic)
+	for(int ij = 0; ij < tr_num * tr_num; ij++){
+		int i = ij / tr_num;
+		int j = ij % tr_num;
+		scores[i][j] = scores_compressed[index_map[i]][index_map[j]];
+	}
+
 	auto dp_ed = chrono::system_clock::now();
 	auto heddc_all_dp = chrono::duration_cast<chrono::milliseconds>(dp_ed - dp_st).count();
 	if(MEASURE_TIME){cout << "heddc_all main dp: " << heddc_all_dp << " msec" << endl;}
+	if(MEASURE_MEMORY_LINUX) measure_mem[2] = get_hwm_kb();
 	measure_time[2] = heddc_all_dp;
+	tr_nums = {tr_num, tr_num_compressed};
 }
+ 
