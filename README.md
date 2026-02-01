@@ -1,6 +1,6 @@
 ## heddc_acc
 `heddc_acc` is an accelerated version of hEDDC (Kawahara & Morishita, 2025) which calculates the edit distance with duplications and contractions (EDDC) between tandem repeats (TRs), including complex TRs composed of multiple units.  
-In this program, precomputations of distances between single units and unit sequences are omitted for long unit sequences, thus speeding up the entire program. Currently, the default parameters are 1.0 for mutations and indels (per base), and 0.5 * unit length for duplications/contractions.
+In this program, precomputations of distances between single units and unit sequences are omitted for long unit sequences, thus speeding up the entire program. Currently, the default parameters are 1.0 for mutations and indels (per base), and 0.6 for duplications/contractions.
 
 ## Usage
 ### Requirements and installation
@@ -53,7 +53,7 @@ Outputs the edit operations (mutations, indels, duplications/contractions) which
 {mut:1, indel:0, dup:}	{mut:0, indel:0, dup:(AGC, 1)}	{mut:0, indel:0, dup:}
 ```
 - `-t` : Output execution time file (Optional)  
-Line 7 and 8 shows the execution time of the entire program (excluding string decomposer).
+Lines 7 and 8 shows the execution time of the entire program (excluding string decomposer).
 ```time.txt
 3 reads before compression
 3 reads after compression
@@ -96,7 +96,7 @@ Set to 0 to use a duplication/contraction cost of 0.5 × unit length.
 Set to 1 to use a fixed duplication/contraction cost of 0.6.
 The default value is 1 (all costs = 0.6).
 These values (e.g., 0.5 and 0.6) can be modified via the
-PARAM_0_VALUE and PARAM_1_VALUE variables in heddc_acc_parallel.h.
+`PARAM_0_VALUE` and `PARAM_1_VALUE` variables in `heddc_acc_parallel.h`.
 
 ## References
 - Tamar Pinhas, Shay Zakov, Dekel Tsur, Michal Ziv-Ukelson, Efficient edit distance with duplications and contractions, *Algorithms Mol Biol* 8, 27, October 2013, [https://doi.org/10.1186/1748-7188-8-27](https://doi.org/10.1186/1748-7188-8-27)
